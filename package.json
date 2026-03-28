@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node index.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
   }
 }
