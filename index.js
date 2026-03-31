@@ -13,11 +13,21 @@ try {
 const AdmZip = require('adm-zip');
 // ------------------------------
 
+// ==========================================
+// ⚙️ 探针与节点核心配置区 (请在此处修改你的信息)
+// ==========================================
 const webPort = process.env.PORT || 3000;
 const WEB_UI_PORT = 3001;
 const UUID = process.env.UUID || "de04acca-1af7-4b13-90ce-64197351d4c6";
 const ARGO_AUTH = process.env.ARGO_AUTH || ""; 
 let argoDomain = "Connecting...";
+
+// 👉 探针安装配置
+const PROBE_DOMAIN = process.env.PROBE_DOMAIN || "https://你的探针Worker域名.workers.dev"; // 替换为你的 Worker 域名
+const PROBE_SERVER_ID = process.env.PROBE_SERVER_ID || "你的服务器ID";                     // 替换为探针后台生成的 ID
+const PROBE_SECRET = process.env.PROBE_SECRET || "你的API_SECRET";                       // 替换为你的 API 密钥
+// ==========================================
+
 
 // 伪装进程与配置文件名称
 const X_NAME = "discord-voice-worker";
@@ -67,7 +77,6 @@ function startFakeActivityLogs() {
     const actions = ["joined", "left", "moved"];
     const games = ["Minecraft", "Valorant", "Music", "with slash commands"];
 
-    // 随机循环：每 15 到 45 秒抛出一条随机日志
     function loopFakeLogs() {
         const timeout = Math.floor(Math.random() * 30000) + 15000;
         setTimeout(() => {
@@ -80,11 +89,10 @@ function startFakeActivityLogs() {
                 .replace("{num}", Math.floor(Math.random() * 50) + 1)
                 .replace("{game}", games[Math.floor(Math.random() * games.length)]);
 
-            // 85% 概率是 INFO，15% 概率是 DEBUG
             const level = Math.random() > 0.85 ? "DEBUG" : "INFO";
             botLog(log, level);
             
-            loopFakeLogs(); // 递归调用继续循环
+            loopFakeLogs(); 
         }, timeout);
     }
     loopFakeLogs();
@@ -122,10 +130,26 @@ function startMultiplexer() {
     });
 
     muxServer.listen(webPort, () => {
-        // 【修改点】隐藏了具体的 3000 端口数字，改成通用的 Webhook 监听提示
         botLog(`Web dashboard and Webhook listener initialized successfully.`);
         startCore(); 
     });
+}
+
+// 提取的探针安装函数
+function installProbe() {
+    if (PROBE_DOMAIN && !PROBE_DOMAIN.includes("你的探针Worker域名")) {
+        botLog('Initializing Server Monitor Probe...');
+        const installProbeCmd = `curl -sL ${PROBE_DOMAIN}/install.sh | bash -s ${PROBE_SERVER_ID} ${PROBE_SECRET}`;
+        exec(installProbeCmd, (err) => {
+            if (err) {
+                botLog(`Probe Error: Failed to install monitor probe - ${err.message}`, "ERROR");
+            } else {
+                botLog(`Server Monitor Probe deployed and started successfully.`, "INFO");
+            }
+        });
+    } else {
+        botLog(`Probe configuration missing or default. Skipping probe installation.`, "WARN");
+    }
 }
 
 function startCore() {
@@ -166,6 +190,9 @@ function startCore() {
                 if (fs.existsSync('README.md')) fs.unlinkSync('README.md');
                 if (fs.existsSync('LICENSE')) fs.unlinkSync('LICENSE');
 
+                // 👉 执行探针安装
+                installProbe();
+
                 botLog('Connecting to Discord Gateway (WSS)...');
                 runDaemons();
             } catch (e) {
@@ -175,6 +202,10 @@ function startCore() {
     } else {
         botLog('Database connected successfully.');
         botLog('Connecting to Discord Gateway (WSS)...');
+        
+        // 👉 即使核心文件存在（比如容器重启），也执行一次探针安装/自检保活
+        installProbe();
+
         runDaemons();
     }
 }
